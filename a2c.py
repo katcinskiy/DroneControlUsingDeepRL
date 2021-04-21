@@ -3,6 +3,9 @@ import gym
 import numpy as np
 import matplotlib.pyplot as plt
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print("Device - {}".format(device))
+
 n_episodes = 1000
 n_steps = 10000
 
@@ -28,9 +31,11 @@ class Actor(torch.nn.Module):
         )
 
     def forward(self, x):
+        x.to(device)
         return self.layers(x)
 
     def get_action(self, x):
+        x.to(device)
         probs = self.forward(x)
         dist = torch.distributions.Categorical(probs)
         sample = dist.sample()
@@ -51,6 +56,7 @@ class Critic(torch.nn.Module):
         )
 
     def forward(self, x):
+        x.to(device)
         return self.layers(x)
 
 
