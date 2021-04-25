@@ -12,11 +12,12 @@ else:
 save_model = True
 
 env = gym.make('CartPole-v1')
+env._max_episode_steps = 200
 state = env.reset()
 n_states = env.observation_space.shape[0]
 n_actions = env.action_space.n
-n_episodes = 1000
-max_steps = 1000
+n_episodes = 200
+max_steps = 200
 GAMMA = 0.9
 
 
@@ -24,15 +25,19 @@ class Reinforce(torch.nn.Module):
     def __init__(self, in_dim, out_dim):
         super().__init__()
         self.num_actions = out_dim
-        self.linear1 = torch.nn.Linear(in_dim, 256)
-        self.linear2 = torch.nn.Linear(256, 64)
-        self.linear3 = torch.nn.Linear(64, out_dim)
+        self.layers = torch.nn.Sequential(
+            torch.nn.Linear(in_dim, 512),
+            torch.nn.ReLU(),
+            torch.nn.Linear(512, 256),
+            torch.nn.ReLU(),
+            torch.nn.Linear(256, 128),
+            torch.nn.ReLU(),
+            torch.nn.Linear(128, out_dim),
+            torch.nn.Softmax()
+        )
 
     def forward(self, x):
-        x = self.linear1(x).clamp(min=0)
-        x = self.linear2(x).clamp(min=0)
-        x = self.linear3(x)
-        return torch.nn.functional.softmax(x, dim=1)
+        return self.layers(x)
 
     def get_action(self, state):
         state = torch.from_numpy(state).float().unsqueeze(0)
@@ -73,6 +78,7 @@ model.to(dev)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
 rewards_size = []
+avg_rewards_size = []
 
 for episode in range(n_episodes):
     state = env.reset()

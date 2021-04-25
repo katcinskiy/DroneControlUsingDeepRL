@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print("Device - {}".format(device))
 
-n_episodes = 1000
+n_episodes = 200
 n_steps = 10000
 
 env = gym.make("CartPole-v1")
@@ -59,6 +59,8 @@ class Critic(torch.nn.Module):
         x.to(device)
         return self.layers(x)
 
+actor_losses = []
+
 
 def update(rewards, log_probs, values, actor_optimizer, critic_optimizer):
     actor_optimizer.zero_grad()
@@ -70,11 +72,13 @@ def update(rewards, log_probs, values, actor_optimizer, critic_optimizer):
         q_values[i] = q_val
     advantage = q_values - values
     actor_loss = (-log_probs * advantage.detach()).mean()
+    actor_losses.append(actor_loss.item())
     critic_loss = 0.5 * advantage.pow(2).mean()
     actor_loss.backward()
     critic_loss.backward()
     actor_optimizer.step()
     critic_optimizer.step()
+
 
 actor = Actor(n_states, n_actions)
 critic = Critic(n_states)
@@ -111,9 +115,11 @@ for episode in range(n_episodes):
     print('episode {}, count {}'.format(episode, count))
     update(rewards, torch.stack(log_probs), torch.stack(values), actor_optimizer, critic_optimizer)
 
+alpha = 0.2
 exp_count_steps = [count_steps[0]]
 for i in range(1, len(count_steps)):
-    exp_count_steps.append(0.4 * exp_count_steps[i - 1] + 0.6 * count_steps[i])
+    exp_count_steps.append((1 - alpha) * exp_count_steps[i - 1] + alpha * count_steps[i])
 plt.plot(count_steps)
 plt.plot(exp_count_steps)
+plt.plot(actor_losses)
 plt.show()
