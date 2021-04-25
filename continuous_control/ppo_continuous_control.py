@@ -179,7 +179,7 @@ class Agent:
                 actions = T.tensor(action_arr[batch]).to(self.actor.device)
 
                 mu, var = self.actor(states)
-                dist = torch.distributions.multivariate_normal.MultivariateNormal(torch.squeeze(mu), torch.torch.diag_embed(var))
+                dist = torch.distributions.multivariate_normal.MultivariateNormal(torch.squeeze(mu.cpu()), torch.torch.diag_embed(var.cpu()))
                 critic_value = self.critic(states)
 
                 critic_value = T.squeeze(critic_value)
