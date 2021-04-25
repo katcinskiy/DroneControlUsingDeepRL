@@ -1,11 +1,10 @@
+import argparse
 import numpy as np
 import os
 import torch
 import torch as T
 import torch.nn as nn
 import torch.optim as optim
-import torch.functional as F
-from torch.distributions.categorical import Categorical
 import gym
 import matplotlib.pyplot as plt
 
@@ -147,7 +146,7 @@ class Agent:
     def choose_action(self, observation):
         state = T.tensor([observation], dtype=T.float).to(self.actor.device)
         action_mu, action_sigma = self.actor.forward(state)
-        action_dist = torch.distributions.multivariate_normal.MultivariateNormal(torch.squeeze(action_mu), torch.diag(torch.squeeze(action_sigma)))
+        action_dist = torch.distributions.multivariate_normal.MultivariateNormal(torch.squeeze(action_mu.cpu()), torch.diag(torch.squeeze(action_sigma.cpu())))
         act = action_dist.sample()
         act = torch.clamp(act, float(env.action_space.low[0]), float(env.action_space.high[0]))
         value = self.critic(state)
@@ -208,8 +207,17 @@ class Agent:
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='PPO continuous control')
+    parser.add_argument(
+        '--render',
+        type=int,
+        default=1,
+        help='Render env'
+    )
+    arguments = parser.parse_args()
+    print('Using rendering - {}'.format(arguments.render))
+
     env = gym.make('BipedalWalker-v3')
-    # env._max_episode_steps = 1000
     N = 20
     batch_size = 5
     n_epochs = 4
@@ -218,13 +226,10 @@ if __name__ == '__main__':
                   alpha=alpha, n_epochs=n_epochs,
                   input_dims=env.observation_space.shape)
     n_games = 200
-
     figure_file = 'plots/cartpole.png'
-
     best_score = env.reward_range[0]
     score_history = []
     avg_score_history = []
-
     learn_iters = 0
     avg_score = 0
     n_steps = 0
@@ -236,7 +241,8 @@ if __name__ == '__main__':
         while not done:
             action, prob, val = agent.choose_action(observation)
             observation_, reward, done, info = env.step(action)
-            env.render()
+            if arguments.render == 1:
+                env.render()
             n_steps += 1
             score += reward
             agent.remember(observation, action, prob, val, reward, done)
