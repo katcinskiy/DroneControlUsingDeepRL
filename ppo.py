@@ -7,9 +7,6 @@ from torch.distributions.categorical import Categorical
 import gym
 import matplotlib.pyplot as plt
 
-env = gym.make("CartPole-v1")
-n_actions = env.action_space.n
-n_states = env.observation_space.shape[0]
 
 
 class PPOMemory:
@@ -56,7 +53,7 @@ class PPOMemory:
 
 
 class CriticNetwork(nn.Module):
-    def __init__(self, input_dims, alpha, fc1_dims=256, fc2_dims=256,
+    def __init__(self, input_dims, alpha, fc1_dims=512, fc2_dims=256,
                  chkpt_dir=''):
         super(CriticNetwork, self).__init__()
 
@@ -87,7 +84,7 @@ class CriticNetwork(nn.Module):
 
 class ActorNetwork(nn.Module):
     def __init__(self, n_actions, input_dims, alpha,
-                 fc1_dims=256, fc2_dims=256, chkpt_dir=''):
+                 fc1_dims=512, fc2_dims=256, chkpt_dir=''):
         super(ActorNetwork, self).__init__()
 
         self.checkpoint_file = os.path.join(chkpt_dir, 'actor_torch_ppo')
@@ -208,8 +205,8 @@ class Agent:
 
 
 if __name__ == '__main__':
-    env = gym.make('FlappyBird-v0')
-    env._max_episode_steps = 1000
+    env = gym.make('LunarLander-v2')
+    # env._max_episode_steps = 1000
     N = 20
     batch_size = 5
     n_epochs = 4
@@ -217,7 +214,8 @@ if __name__ == '__main__':
     agent = Agent(n_actions=env.action_space.n, batch_size=batch_size,
                   alpha=alpha, n_epochs=n_epochs,
                   input_dims=env.observation_space.shape)
-    n_games = 500
+    # agent.load_models()
+    n_games = 200
 
     figure_file = 'plots/cartpole.png'
 
