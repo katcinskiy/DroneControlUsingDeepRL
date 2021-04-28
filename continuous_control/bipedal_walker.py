@@ -1,10 +1,10 @@
-import argparse
 import numpy as np
 import os
-import torch
 import torch as T
+import torch.distributions.normal
 import torch.nn as nn
 import torch.optim as optim
+from torch.distributions.categorical import Categorical
 import gym
 import matplotlib.pyplot as plt
 
@@ -53,19 +53,17 @@ class PPOMemory:
 
 
 class CriticNetwork(nn.Module):
-    def __init__(self, input_dims, alpha, fc1_dims=512, fc2_dims=256, fc3_dims=128,
-                 chkpt_dir=''):
+    def __init__(self, input_dims, alpha, fc1_dims=512, fc2_dims=256,
+                 chkpt_dir='continuous_lunar_lander_weights'):
         super(CriticNetwork, self).__init__()
 
-        self.checkpoint_file = os.path.join(chkpt_dir, 'critic_torch_ppo')
+        self.checkpoint_file = os.path.join(chkpt_dir, 'critic_torch_ppo_bipedal_walker')
         self.critic = nn.Sequential(
-            nn.Linear(*input_dims, fc1_dims),
+            nn.Linear(input_dims, fc1_dims),
             nn.ReLU(),
             nn.Linear(fc1_dims, fc2_dims),
             nn.ReLU(),
-            nn.Linear(fc2_dims, fc3_dims),
-            nn.ReLU(),
-            nn.Linear(fc3_dims, 1),
+            nn.Linear(fc2_dims, 1)
         )
 
         self.optimizer = optim.Adam(self.parameters(), lr=alpha)
@@ -84,64 +82,132 @@ class CriticNetwork(nn.Module):
         self.load_state_dict(T.load(self.checkpoint_file))
 
 
-mu_history_1 = []
-mu_history_2 = []
-
+mu_history = []
 
 class ActorNetwork(nn.Module):
     def __init__(self, n_actions, input_dims, alpha,
-                 fc1_dims=256, fc2_dims=256, fc3_dims=128, chkpt_dir=''):
+                 fc1_dims=512, fc2_dims=256, fc3_dims=256, chkpt_dir='continuous_lunar_lander_weights'):
         super(ActorNetwork, self).__init__()
+        self.n_actions = n_actions
+        self.checkpoint_file = os.path.join(chkpt_dir, 'actor_torch_ppo_bipedal_walker')
 
-        self.checkpoint_file = os.path.join(chkpt_dir, 'actor_torch_ppo')
+        # self.base = nn.Sequential(
+        #     nn.Linear(*input_dims, fc1_dims),
+        #     nn.ReLU(),
+        # )
 
-        self.base = nn.Sequential(
-            nn.Linear(*input_dims, fc1_dims),
+        # self.actors = [
+        #     {
+        #         'actor': nn.Sequential(
+        #                     nn.Linear(*input_dims, fc1_dims),
+        #                     nn.ReLU(),
+        #                     nn.Linear(fc1_dims, fc2_dims),
+        #                     nn.ReLU(),
+        #                     nn.Linear(fc2_dims, fc3_dims),
+        #                     nn.ReLU()
+        #                 ),
+        #         'mu': nn.Sequential(
+        #                     nn.Linear(fc3_dims, 1),
+        #                     nn.Tanh()
+        #                 ),
+        #         'var': nn.Sequential(
+        #                     nn.Linear(fc3_dims, 1),
+        #                     nn.Softplus()
+        #                 ),
+        #     }
+        #     for _ in range(n_actions)
+        # ]
+
+        self.actor1 = nn.Sequential(
+            nn.Linear(input_dims, fc1_dims),
             nn.ReLU(),
             nn.Linear(fc1_dims, fc2_dims),
             nn.ReLU(),
             nn.Linear(fc2_dims, fc3_dims),
-            nn.ReLU(),
-            # nn.Linear(fc3_dims, n_actions),
+            nn.ReLU()
         )
-        self.actions = [
-            {
-                'mu': nn.Sequential(
-                            nn.Linear(fc3_dims, 50),
-                            nn.ReLU(),
-                            nn.Linear(50, 1),
-                            nn.Tanh()
-                        ),
-                'var': nn.Sequential(
-                            nn.Linear(fc3_dims, 50),
-                            nn.ReLU(),
-                            nn.Linear(50, 1),
-                            nn.Softplus()
-                        ),
-            }
-            for _ in range(n_actions)
-        ]
-
-        self.mu = nn.Sequential(
-            nn.Linear(fc3_dims, n_actions),
+        self.mu1 = nn.Sequential(
+            nn.Linear(fc3_dims, 1),
             nn.Tanh()
         )
-        self.var = nn.Sequential(
-            nn.Linear(fc3_dims, n_actions),
+        self.var1 = nn.Sequential(
+            nn.Linear(fc3_dims, 1),
             nn.Softplus()
         )
+
+        self.actor2 = nn.Sequential(
+            nn.Linear(input_dims, fc1_dims),
+            nn.ReLU(),
+            nn.Linear(fc1_dims, fc2_dims),
+            nn.ReLU(),
+            nn.Linear(fc2_dims, fc3_dims),
+            nn.ReLU()
+        )
+        self.mu2 = nn.Sequential(
+            nn.Linear(fc3_dims, 1),
+            nn.Tanh()
+        )
+        self.var2 = nn.Sequential(
+            nn.Linear(fc3_dims, 1),
+            nn.Softplus()
+        )
+
+        self.actor3 = nn.Sequential(
+            nn.Linear(input_dims, fc1_dims),
+            nn.ReLU(),
+            nn.Linear(fc1_dims, fc2_dims),
+            nn.ReLU(),
+            nn.Linear(fc2_dims, fc3_dims),
+            nn.ReLU()
+        )
+        self.mu3 = nn.Sequential(
+            nn.Linear(fc3_dims, 1),
+            nn.Tanh()
+        )
+        self.var3 = nn.Sequential(
+            nn.Linear(fc3_dims, 1),
+            nn.Softplus()
+        )
+
+        self.actor4 = nn.Sequential(
+            nn.Linear(input_dims, fc1_dims),
+            nn.ReLU(),
+            nn.Linear(fc1_dims, fc2_dims),
+            nn.ReLU(),
+            nn.Linear(fc2_dims, fc3_dims),
+            nn.ReLU()
+        )
+        self.mu4 = nn.Sequential(
+            nn.Linear(fc3_dims, 1),
+            nn.Tanh()
+        )
+        self.var4 = nn.Sequential(
+            nn.Linear(fc3_dims, 1),
+            nn.Softplus()
+        )
+
         self.optimizer = optim.Adam(self.parameters(), lr=alpha)
         self.device = T.device('cuda:0' if T.cuda.is_available() else 'cpu')
         self.to(self.device)
 
     def forward(self, state):
-        state = self.base(state)
-        mus = torch.squeeze(torch.stack([self.actions[0]['mu'](state), self.actions[1]['mu'](state)], axis=1))
-        vars = torch.squeeze(torch.stack([self.actions[0]['var'](state), self.actions[1]['var'](state)], axis=1))
-        mu_history_1.append(mus[0])
-        mu_history_2.append(mus[1])
-        return mus, vars
+        # state = self.base(state)
+        base1 = self.actor1(state)
+        base2 = self.actor2(state)
+        base3 = self.actor3(state)
+        base4 = self.actor4(state)
+        mu1 = self.mu1(base1)
+        mu2 = self.mu2(base2)
+        mu3 = self.mu2(base3)
+        mu4 = self.mu2(base4)
+        var1 = self.var1(base1)
+        var2 = self.var2(base2)
+        var3 = self.var2(base3)
+        var4 = self.var2(base4)
+        dist = torch.distributions.multivariate_normal.MultivariateNormal(torch.cat((mu1, mu2, mu3, mu4), 1),
+                                                                          torch.diag_embed(torch.cat((var1, var2, var3, var4), 1)))
 
+        return dist
 
     def save_checkpoint(self):
         T.save(self.state_dict(), self.checkpoint_file)
@@ -149,11 +215,10 @@ class ActorNetwork(nn.Module):
     def load_checkpoint(self):
         self.load_state_dict(T.load(self.checkpoint_file))
 
-ratios = []
 
 class Agent:
     def __init__(self, n_actions, input_dims, gamma=0.99, alpha=0.0003, gae_lambda=0.95,
-                 policy_clip=0.5, batch_size=64, n_epochs=10):
+                 policy_clip=0.15, batch_size=64, n_epochs=10):
         self.gamma = gamma
         self.policy_clip = policy_clip
         self.n_epochs = n_epochs
@@ -178,16 +243,16 @@ class Agent:
 
     def choose_action(self, observation):
         state = T.tensor([observation], dtype=T.float).to(self.actor.device)
-        action_mu, action_sigma = self.actor.forward(state)
 
-        action_dist = torch.distributions.multivariate_normal.MultivariateNormal(torch.squeeze(action_mu.cpu()), torch.diag(torch.squeeze(action_sigma.cpu())))
-        # action_dist = torch.distributions.normal.Normal(torch.squeeze(action_mu.cpu()), torch.squeeze(action_sigma.cpu()))
-        # action_dist = [torch.distributions.normal.Normal(mu, var) for mu, var in zip(torch.squeeze(action_mu.cpu()), torch.squeeze(action_sigma.cpu()))]
-        act = action_dist.sample()
-        act = torch.clamp(act, float(env.action_space.low[0]), float(env.action_space.high[0]))
+        dist = self.actor(state)
         value = self.critic(state)
+        action = dist.sample()
+
+        probs = T.squeeze(dist.log_prob(action)).item()
+        action = T.squeeze(action).detach().numpy()
         value = T.squeeze(value).item()
-        return act.detach().numpy(), T.squeeze(action_dist.log_prob(act)).item(), value
+
+        return action, probs, value
 
     def learn(self):
         for _ in range(self.n_epochs):
@@ -214,18 +279,14 @@ class Agent:
                 old_probs = T.tensor(old_prob_arr[batch]).to(self.actor.device)
                 actions = T.tensor(action_arr[batch]).to(self.actor.device)
 
-                mu, var = self.actor(states)
-                dist = torch.distributions.multivariate_normal.MultivariateNormal(torch.squeeze(mu.cpu()), torch.torch.diag_embed(var.cpu()))
-                # dist = torch.distributions.normal.Normal(torch.squeeze(mu.cpu()),
-                #                                                 torch.squeeze(var.cpu()))
+                dist = self.actor(states)
                 critic_value = self.critic(states)
 
                 critic_value = T.squeeze(critic_value)
 
                 new_probs = dist.log_prob(actions)
-                # prob_ratio = new_probs.exp() / old_probs.exp()
-                # ratios.append(prob_ratio[0].item())
-                prob_ratio = (new_probs - old_probs).exp()
+                prob_ratio = new_probs.exp() / old_probs.exp()
+                # prob_ratio = (new_probs - old_probs).exp()
                 weighted_probs = advantage[batch] * prob_ratio
                 weighted_clipped_probs = T.clamp(prob_ratio, 1 - self.policy_clip,
                                                  1 + self.policy_clip) * advantage[batch]
@@ -246,31 +307,24 @@ class Agent:
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='PPO continuous control')
-    parser.add_argument(
-        '--render',
-        type=int,
-        default=1,
-        help='Render env'
-    )
-    arguments = parser.parse_args()
-    print('Using rendering - {}'.format(arguments.render))
-
-    env = gym.make('LunarLanderContinuous-v2')
-    N = 30
-    batch_size = 10
-    n_epochs = 10
-    policy_clip = 0.2
-    alpha = 3e-4
-    agent = Agent(n_actions=env.action_space.shape[0], batch_size=batch_size, policy_clip=policy_clip,
+    env = gym.make('BipedalWalker-v3')
+    # env._max_episode_steps = 1000
+    N = 1000
+    batch_size = 100
+    n_epochs = 4
+    alpha = 8e-5
+    agent = Agent(n_actions=4, batch_size=batch_size,
                   alpha=alpha, n_epochs=n_epochs,
-                  input_dims=env.observation_space.shape)
+                  input_dims=env.observation_space.shape[0])
     agent.load_models()
     n_games = 500
+
     figure_file = 'plots/cartpole.png'
+
     best_score = env.reward_range[0]
     score_history = []
     avg_score_history = []
+
     learn_iters = 0
     avg_score = 0
     n_steps = 0
@@ -282,8 +336,7 @@ if __name__ == '__main__':
         while not done:
             action, prob, val = agent.choose_action(observation)
             observation_, reward, done, info = env.step(action)
-            # if arguments.render == 1:
-            #     env.render()
+            env.render()
             n_steps += 1
             score += reward
             agent.remember(observation, action, prob, val, reward, done)
@@ -305,6 +358,8 @@ if __name__ == '__main__':
     # plot_learning_curve(x, score_history, figure_file)
     # plt.plot(score_history)
     # plt.plot(avg_score_history)
-    plot.plot(mu_history_1)
-    plt.title('N - {}, batch_size - {}, n_epochs - {}, policy_clip - {}'.format(N, batch_size, n_epochs, policy_clip))
+    fig, axs = plt.subplots(2)
+    axs[0].plot(score_history)
+    axs[0].plot(avg_score_history)
+    axs[1].plot([mu_history[i][0].item() for i in range(len(mu_history))])
     plt.show()

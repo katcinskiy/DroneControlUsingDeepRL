@@ -1,12 +1,9 @@
 import numpy as np
 import os
 import torch as T
+import torch.distributions.normal
 import torch.nn as nn
 import torch.optim as optim
-from torch.distributions.categorical import Categorical
-import gym
-import matplotlib.pyplot as plt
-
 
 
 class PPOMemory:
@@ -54,12 +51,12 @@ class PPOMemory:
 
 class CriticNetwork(nn.Module):
     def __init__(self, input_dims, alpha, fc1_dims=512, fc2_dims=256,
-                 chkpt_dir=''):
+                 chkpt_dir='drone_weights'):
         super(CriticNetwork, self).__init__()
 
-        self.checkpoint_file = os.path.join(chkpt_dir, 'critic_torch_ppo')
+        self.checkpoint_file = os.path.join(chkpt_dir, 'critic')
         self.critic = nn.Sequential(
-            nn.Linear(*input_dims, fc1_dims),
+            nn.Linear(input_dims, fc1_dims),
             nn.ReLU(),
             nn.Linear(fc1_dims, fc2_dims),
             nn.ReLU(),
@@ -84,17 +81,77 @@ class CriticNetwork(nn.Module):
 
 class ActorNetwork(nn.Module):
     def __init__(self, n_actions, input_dims, alpha,
-                 fc1_dims=512, fc2_dims=256, chkpt_dir=''):
+                 fc1_dims=512, fc2_dims=256, fc3_dims=256, chkpt_dir='drone_weights'):
         super(ActorNetwork, self).__init__()
+        self.n_actions = n_actions
+        self.checkpoint_file = os.path.join(chkpt_dir, 'actor')
 
-        self.checkpoint_file = os.path.join(chkpt_dir, 'actor_torch_ppo')
-        self.actor = nn.Sequential(
-            nn.Linear(*input_dims, fc1_dims),
+        self.actor1 = nn.Sequential(
+            nn.Linear(input_dims, fc1_dims),
             nn.ReLU(),
             nn.Linear(fc1_dims, fc2_dims),
             nn.ReLU(),
-            nn.Linear(fc2_dims, n_actions),
-            nn.Softmax(dim=-1)
+            nn.Linear(fc2_dims, fc3_dims),
+            nn.ReLU()
+        )
+        self.mu1 = nn.Sequential(
+            nn.Linear(fc3_dims, 1),
+            nn.Tanh()
+        )
+        self.var1 = nn.Sequential(
+            nn.Linear(fc3_dims, 1),
+            nn.Softplus()
+        )
+
+        self.actor2 = nn.Sequential(
+            nn.Linear(input_dims, fc1_dims),
+            nn.ReLU(),
+            nn.Linear(fc1_dims, fc2_dims),
+            nn.ReLU(),
+            nn.Linear(fc2_dims, fc3_dims),
+            nn.ReLU()
+        )
+        self.mu2 = nn.Sequential(
+            nn.Linear(fc3_dims, 1),
+            nn.Tanh()
+        )
+        self.var2 = nn.Sequential(
+            nn.Linear(fc3_dims, 1),
+            nn.Softplus()
+        )
+
+        self.actor3 = nn.Sequential(
+            nn.Linear(input_dims, fc1_dims),
+            nn.ReLU(),
+            nn.Linear(fc1_dims, fc2_dims),
+            nn.ReLU(),
+            nn.Linear(fc2_dims, fc3_dims),
+            nn.ReLU()
+        )
+        self.mu3 = nn.Sequential(
+            nn.Linear(fc3_dims, 1),
+            nn.Tanh()
+        )
+        self.var3 = nn.Sequential(
+            nn.Linear(fc3_dims, 1),
+            nn.Softplus()
+        )
+
+        self.actor4 = nn.Sequential(
+            nn.Linear(input_dims, fc1_dims),
+            nn.ReLU(),
+            nn.Linear(fc1_dims, fc2_dims),
+            nn.ReLU(),
+            nn.Linear(fc2_dims, fc3_dims),
+            nn.ReLU()
+        )
+        self.mu4 = nn.Sequential(
+            nn.Linear(fc3_dims, 1),
+            nn.Tanh()
+        )
+        self.var4 = nn.Sequential(
+            nn.Linear(fc3_dims, 1),
+            nn.Softplus()
         )
 
         self.optimizer = optim.Adam(self.parameters(), lr=alpha)
@@ -102,8 +159,22 @@ class ActorNetwork(nn.Module):
         self.to(self.device)
 
     def forward(self, state):
-        dist = self.actor(state)
-        dist = Categorical(dist)
+        # state = self.base(state)
+        base1 = self.actor1(state)
+        base2 = self.actor2(state)
+        base3 = self.actor3(state)
+        base4 = self.actor4(state)
+        mu1 = self.mu1(base1)
+        mu2 = self.mu2(base2)
+        mu3 = self.mu2(base3)
+        mu4 = self.mu2(base4)
+        var1 = self.var1(base1)
+        var2 = self.var2(base2)
+        var3 = self.var2(base3)
+        var4 = self.var2(base4)
+        dist = torch.distributions.multivariate_normal.MultivariateNormal(torch.cat((mu1, mu2, mu3, mu4), 1),
+                                                                          torch.diag_embed(
+                                                                              torch.cat((var1, var2, var3, var4), 1)))
 
         return dist
 
@@ -147,7 +218,7 @@ class Agent:
         action = dist.sample()
 
         probs = T.squeeze(dist.log_prob(action)).item()
-        action = T.squeeze(action).item()
+        action = T.squeeze(action).detach().numpy()
         value = T.squeeze(value).item()
 
         return action, probs, value
@@ -202,58 +273,3 @@ class Agent:
                 self.critic.optimizer.step()
 
         self.memory.clear_memory()
-
-
-if __name__ == '__main__':
-    env = gym.make('LunarLander-v2')
-    # env._max_episode_steps = 1000
-    N = 20
-    batch_size = 5
-    n_epochs = 4
-    alpha = 0.0003
-    agent = Agent(n_actions=env.action_space.n, batch_size=batch_size,
-                  alpha=alpha, n_epochs=n_epochs,
-                  input_dims=env.observation_space.shape)
-    # agent.load_models()
-    n_games = 200
-
-    figure_file = 'plots/cartpole.png'
-
-    best_score = env.reward_range[0]
-    score_history = []
-    avg_score_history = []
-
-    learn_iters = 0
-    avg_score = 0
-    n_steps = 0
-
-    for i in range(n_games):
-        observation = env.reset()
-        done = False
-        score = 0
-        while not done:
-            action, prob, val = agent.choose_action(observation)
-            observation_, reward, done, info = env.step(action)
-            env.render()
-            n_steps += 1
-            score += reward
-            agent.remember(observation, action, prob, val, reward, done)
-            if n_steps % N == 0:
-                agent.learn()
-                learn_iters += 1
-            observation = observation_
-        score_history.append(score)
-        avg_score = np.mean(score_history[-70:])
-        avg_score_history.append(avg_score)
-
-        if avg_score > best_score:
-            best_score = avg_score
-            agent.save_models()
-
-        print('episode', i, 'score %.1f' % score, 'avg score %.1f' % avg_score,
-              'time_steps', n_steps, 'learning_steps', learn_iters)
-    x = [i + 1 for i in range(len(score_history))]
-    # plot_learning_curve(x, score_history, figure_file)
-    plt.plot(score_history)
-    plt.plot(avg_score_history)
-    plt.show()

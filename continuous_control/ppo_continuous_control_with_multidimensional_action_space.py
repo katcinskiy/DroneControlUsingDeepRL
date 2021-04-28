@@ -88,12 +88,12 @@ mu_history_1 = []
 mu_history_2 = []
 
 
-class ActorNetwork(nn.Module):
+class ActorNetworkAction1(nn.Module):
     def __init__(self, n_actions, input_dims, alpha,
                  fc1_dims=256, fc2_dims=256, fc3_dims=128, chkpt_dir=''):
-        super(ActorNetwork, self).__init__()
+        super(ActorNetworkAction1, self).__init__()
 
-        self.checkpoint_file = os.path.join(chkpt_dir, 'actor_torch_ppo')
+        self.checkpoint_file = os.path.join(chkpt_dir, 'actor_torch_ppo_1')
 
         self.base = nn.Sequential(
             nn.Linear(*input_dims, fc1_dims),
@@ -102,32 +102,13 @@ class ActorNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(fc2_dims, fc3_dims),
             nn.ReLU(),
-            # nn.Linear(fc3_dims, n_actions),
         )
-        self.actions = [
-            {
-                'mu': nn.Sequential(
-                            nn.Linear(fc3_dims, 50),
-                            nn.ReLU(),
-                            nn.Linear(50, 1),
-                            nn.Tanh()
-                        ),
-                'var': nn.Sequential(
-                            nn.Linear(fc3_dims, 50),
-                            nn.ReLU(),
-                            nn.Linear(50, 1),
-                            nn.Softplus()
-                        ),
-            }
-            for _ in range(n_actions)
-        ]
-
         self.mu = nn.Sequential(
-            nn.Linear(fc3_dims, n_actions),
+            nn.Linear(fc3_dims, 1),
             nn.Tanh()
         )
         self.var = nn.Sequential(
-            nn.Linear(fc3_dims, n_actions),
+            nn.Linear(fc3_dims, 1),
             nn.Softplus()
         )
         self.optimizer = optim.Adam(self.parameters(), lr=alpha)
@@ -136,11 +117,7 @@ class ActorNetwork(nn.Module):
 
     def forward(self, state):
         state = self.base(state)
-        mus = torch.squeeze(torch.stack([self.actions[0]['mu'](state), self.actions[1]['mu'](state)], axis=1))
-        vars = torch.squeeze(torch.stack([self.actions[0]['var'](state), self.actions[1]['var'](state)], axis=1))
-        mu_history_1.append(mus[0])
-        mu_history_2.append(mus[1])
-        return mus, vars
+        return torch.squeeze(self.mu(state)), torch.squeeze(self.var(state))
 
 
     def save_checkpoint(self):
@@ -149,7 +126,46 @@ class ActorNetwork(nn.Module):
     def load_checkpoint(self):
         self.load_state_dict(T.load(self.checkpoint_file))
 
-ratios = []
+
+class ActorNetworkAction2(nn.Module):
+    def __init__(self, n_actions, input_dims, alpha,
+                 fc1_dims=256, fc2_dims=256, fc3_dims=128, chkpt_dir=''):
+        super(ActorNetworkAction2, self).__init__()
+
+        self.checkpoint_file = os.path.join(chkpt_dir, 'actor_torch_ppo_2')
+
+        self.base = nn.Sequential(
+            nn.Linear(*input_dims, fc1_dims),
+            nn.ReLU(),
+            nn.Linear(fc1_dims, fc2_dims),
+            nn.ReLU(),
+            nn.Linear(fc2_dims, fc3_dims),
+            nn.ReLU(),
+        )
+        self.mu = nn.Sequential(
+            nn.Linear(fc3_dims, 1),
+            nn.Tanh()
+        )
+        self.var = nn.Sequential(
+            nn.Linear(fc3_dims, 1),
+            nn.Softplus()
+        )
+        self.optimizer = optim.Adam(self.parameters(), lr=alpha)
+        self.device = T.device('cuda:0' if T.cuda.is_available() else 'cpu')
+        self.to(self.device)
+
+    def forward(self, state):
+        state = self.base(state)
+        return torch.squeeze(self.mu(state)), torch.squeeze(self.var(state))
+
+
+    def save_checkpoint(self):
+        T.save(self.state_dict(), self.checkpoint_file)
+
+    def load_checkpoint(self):
+        self.load_state_dict(T.load(self.checkpoint_file))
+
+
 
 class Agent:
     def __init__(self, n_actions, input_dims, gamma=0.99, alpha=0.0003, gae_lambda=0.95,
@@ -159,7 +175,8 @@ class Agent:
         self.n_epochs = n_epochs
         self.gae_lambda = gae_lambda
 
-        self.actor = ActorNetwork(n_actions, input_dims, alpha)
+        self.actorAction1 = ActorNetworkAction1(n_actions, input_dims, alpha)
+        self.actorAction2 = ActorNetworkAction2(n_actions, input_dims, alpha)
         self.critic = CriticNetwork(input_dims, alpha)
         self.memory = PPOMemory(batch_size)
 
@@ -168,17 +185,24 @@ class Agent:
 
     def save_models(self):
         print('... saving models ...')
-        self.actor.save_checkpoint()
+        self.actorAction1.save_checkpoint()
+        self.actorAction2.save_checkpoint()
         self.critic.save_checkpoint()
 
     def load_models(self):
         print('... loading models ...')
-        self.actor.load_checkpoint()
+        self.actorAction1.load_checkpoint()
+        self.actorAction2.load_checkpoint()
         self.critic.load_checkpoint()
 
     def choose_action(self, observation):
-        state = T.tensor([observation], dtype=T.float).to(self.actor.device)
-        action_mu, action_sigma = self.actor.forward(state)
+        state = T.tensor([observation], dtype=T.float).to(self.actorAction1.device)
+        action_mu_1, action_sigma_1 = self.actorAction1.forward(state)
+        action_mu_2, action_sigma_2 = self.actorAction2.forward(state)
+        action_mu = torch.stack([action_mu_1, action_mu_2])
+        action_sigma = torch.stack([action_sigma_1, action_sigma_2])
+        mu_history_1.append(action_mu_1)
+        mu_history_2.append(action_mu_2)
 
         action_dist = torch.distributions.multivariate_normal.MultivariateNormal(torch.squeeze(action_mu.cpu()), torch.diag(torch.squeeze(action_sigma.cpu())))
         # action_dist = torch.distributions.normal.Normal(torch.squeeze(action_mu.cpu()), torch.squeeze(action_sigma.cpu()))
@@ -206,15 +230,18 @@ class Agent:
                                        (1 - int(dones_arr[k])) - values[k])
                     discount *= self.gamma * self.gae_lambda
                 advantage[t] = a_t
-            advantage = T.tensor(advantage).to(self.actor.device)
+            advantage = T.tensor(advantage).to(self.actorAction1.device)
 
-            values = T.tensor(values).to(self.actor.device)
+            values = T.tensor(values).to(self.actorAction1.device)
             for batch in batches:
-                states = T.tensor(state_arr[batch], dtype=T.float).to(self.actor.device)
-                old_probs = T.tensor(old_prob_arr[batch]).to(self.actor.device)
-                actions = T.tensor(action_arr[batch]).to(self.actor.device)
+                states = T.tensor(state_arr[batch], dtype=T.float).to(self.actorAction1.device)
+                old_probs = T.tensor(old_prob_arr[batch]).to(self.actorAction1.device)
+                actions = T.tensor(action_arr[batch]).to(self.actorAction1.device)
 
-                mu, var = self.actor(states)
+                action_mu_1, action_sigma_1 = self.actorAction1.forward(states)
+                action_mu_2, action_sigma_2 = self.actorAction2.forward(states)
+                mu = torch.stack([action_mu_1, action_mu_2], axis=1)
+                var = torch.stack([action_sigma_1, action_sigma_2], axis=1)
                 dist = torch.distributions.multivariate_normal.MultivariateNormal(torch.squeeze(mu.cpu()), torch.torch.diag_embed(var.cpu()))
                 # dist = torch.distributions.normal.Normal(torch.squeeze(mu.cpu()),
                 #                                                 torch.squeeze(var.cpu()))
@@ -236,10 +263,12 @@ class Agent:
                 critic_loss = critic_loss.mean()
 
                 total_loss = actor_loss + 0.5 * critic_loss
-                self.actor.optimizer.zero_grad()
+                self.actorAction1.optimizer.zero_grad()
+                self.actorAction2.optimizer.zero_grad()
                 self.critic.optimizer.zero_grad()
                 total_loss.backward()
-                self.actor.optimizer.step()
+                self.actorAction1.optimizer.step()
+                self.actorAction2.optimizer.step()
                 self.critic.optimizer.step()
 
         self.memory.clear_memory()
@@ -259,13 +288,13 @@ if __name__ == '__main__':
     env = gym.make('LunarLanderContinuous-v2')
     N = 30
     batch_size = 10
-    n_epochs = 10
+    n_epochs = 5
     policy_clip = 0.2
     alpha = 3e-4
     agent = Agent(n_actions=env.action_space.shape[0], batch_size=batch_size, policy_clip=policy_clip,
                   alpha=alpha, n_epochs=n_epochs,
                   input_dims=env.observation_space.shape)
-    agent.load_models()
+    # agent.load_models()
     n_games = 500
     figure_file = 'plots/cartpole.png'
     best_score = env.reward_range[0]
@@ -303,8 +332,19 @@ if __name__ == '__main__':
               'time_steps', n_steps, 'learning_steps', learn_iters)
     x = [i + 1 for i in range(len(score_history))]
     # plot_learning_curve(x, score_history, figure_file)
-    # plt.plot(score_history)
-    # plt.plot(avg_score_history)
-    plot.plot(mu_history_1)
+    plt.plot(score_history)
+    plt.plot(avg_score_history)
+    mu_history_1_ = [mu_history_1[i].item() for i in range(len(mu_history_1))]
+    mu_history_2_ = [mu_history_2[i].item() for i in range(len(mu_history_2))]
+    fig, axs = plt.subplots(4)
+    axs[0].plot(mu_history_2_)
+    axs[1].plot(mu_history_1_)
+    axs[2].plot(mu_history_1_)
+    axs[2].plot(mu_history_2_)
+    axs[3].plot(score_history)
+    axs[3].plot(avg_score_history)
+    fig.tight_layout()
+
+
     plt.title('N - {}, batch_size - {}, n_epochs - {}, policy_clip - {}'.format(N, batch_size, n_epochs, policy_clip))
     plt.show()

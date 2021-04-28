@@ -75,10 +75,11 @@ class LiftoffAviary(BaseSingleAgentAviary):
 
         """
         state = self._getDroneStateVector(0)
-        if state[2] < 0.02:
-            return -5
-        else:
-            return -1 / (10 * state[2])
+        return -np.linalg.norm(state[:3] - np.array([0, 0, 0.5]))
+        # if state[2] < 0.02:
+        #     return -5
+        # else:
+        #     return -1 / (10 * state[2])
 
     ################################################################################
 
@@ -91,6 +92,9 @@ class LiftoffAviary(BaseSingleAgentAviary):
             Whether the current episode is done.
 
         """
+        state = self._getDroneStateVector(0)
+        if not (abs(state[0]) < 1 and abs(state[1] < 1)):
+            return True
         if self.step_counter / self.SIM_FREQ > self.EPISODE_LEN_SEC:
             return True
         else:
@@ -189,21 +193,21 @@ class LiftoffAviary(BaseSingleAgentAviary):
         Print a warning if values in a state vector is out of the clipping range.
 
         """
-        if not (clipped_pos_xy == np.array(state[0:2])).all():
-            print("[WARNING] it", self.step_counter,
-                  "in TakeoffAviary._clipAndNormalizeState(), clipped xy position [{:.2f} {:.2f}]".format(state[0],
-                                                                                                          state[1]))
-        if not (clipped_pos_z == np.array(state[2])).all():
-            print("[WARNING] it", self.step_counter,
-                  "in TakeoffAviary._clipAndNormalizeState(), clipped z position [{:.2f}]".format(state[2]))
-        if not (clipped_rp == np.array(state[7:9])).all():
-            print("[WARNING] it", self.step_counter,
-                  "in TakeoffAviary._clipAndNormalizeState(), clipped roll/pitch [{:.2f} {:.2f}]".format(state[7],
-                                                                                                         state[8]))
-        if not (clipped_vel_xy == np.array(state[10:12])).all():
-            print("[WARNING] it", self.step_counter,
-                  "in TakeoffAviary._clipAndNormalizeState(), clipped xy velocity [{:.2f} {:.2f}]".format(state[10],
-                                                                                                          state[11]))
-        if not (clipped_vel_z == np.array(state[12])).all():
-            print("[WARNING] it", self.step_counter,
-                  "in TakeoffAviary._clipAndNormalizeState(), clipped z velocity [{:.2f}]".format(state[12]))
+        # if not (clipped_pos_xy == np.array(state[0:2])).all():
+        #     print("[WARNING] it", self.step_counter,
+        #           "in TakeoffAviary._clipAndNormalizeState(), clipped xy position [{:.2f} {:.2f}]".format(state[0],
+        #                                                                                                   state[1]))
+        # if not (clipped_pos_z == np.array(state[2])).all():
+        #     print("[WARNING] it", self.step_counter,
+        #           "in TakeoffAviary._clipAndNormalizeState(), clipped z position [{:.2f}]".format(state[2]))
+        # if not (clipped_rp == np.array(state[7:9])).all():
+        #     print("[WARNING] it", self.step_counter,
+        #           "in TakeoffAviary._clipAndNormalizeState(), clipped roll/pitch [{:.2f} {:.2f}]".format(state[7],
+        #                                                                                                  state[8]))
+        # if not (clipped_vel_xy == np.array(state[10:12])).all():
+        #     print("[WARNING] it", self.step_counter,
+        #           "in TakeoffAviary._clipAndNormalizeState(), clipped xy velocity [{:.2f} {:.2f}]".format(state[10],
+        #                                                                                                   state[11]))
+        # if not (clipped_vel_z == np.array(state[12])).all():
+        #     print("[WARNING] it", self.step_counter,
+        #           "in TakeoffAviary._clipAndNormalizeState(), clipped z velocity [{:.2f}]".format(state[12]))
