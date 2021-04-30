@@ -6,12 +6,13 @@ from gym_pybullet_drones.envs.single_agent_rl.BaseSingleAgentAviary import Actio
     BaseSingleAgentAviary
 
 
-class LiftoffAviary(BaseSingleAgentAviary):
+class NavigationAviary(BaseSingleAgentAviary):
     """Single agent RL problem: take-off."""
 
     ################################################################################
 
     def __init__(self,
+                 goal,
                  drone_model: DroneModel = DroneModel.CF2X,
                  initial_xyzs=None,
                  initial_rpys=None,
@@ -62,6 +63,7 @@ class LiftoffAviary(BaseSingleAgentAviary):
                          obs=obs,
                          act=act
                          )
+        self.goal = goal
 
     ################################################################################
 
@@ -74,15 +76,13 @@ class LiftoffAviary(BaseSingleAgentAviary):
             The reward.
 
         """
-        state = self._getDroneStateVector(0)
-        # if abs(state[0]) >= 1.0 or abs(state[1]) >= 1.0:
-        #     return -100
         # state = self._getDroneStateVector(0)
-        # return -np.linalg.norm(state[:3] - np.array([0, 0, 0.5]))
-        if state[2] < 0.02:
-            return -5
-        else:
-            return -1 / (10 * state[2])
+        # # if state[2] < 0.02:
+        # #     return -5
+        # # else:
+        # #     return -1 / (10 * state[2])
+        # return -np.linalg.norm(self.goal - state[:3])
+        return np.linalg.norm(self.rpy)
 
     ################################################################################
 
@@ -100,12 +100,6 @@ class LiftoffAviary(BaseSingleAgentAviary):
             return True
         else:
             return False
-        # if abs(state[0]) >= 1.5 or abs(state[1]) >= 1.5:
-        #     return True
-        # if self.step_counter / self.SIM_FREQ > self.EPISODE_LEN_SEC:
-        #     return True
-        # else:
-        #     return False
 
     ################################################################################
 

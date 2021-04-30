@@ -57,8 +57,9 @@ class CriticNetwork(nn.Module):
                  chkpt_dir='continuous_lunar_lander_weights'):
         super(CriticNetwork, self).__init__()
 
-        self.checkpoint_file = os.path.join(chkpt_dir, 'critic_torch_ppo')
+        self.checkpoint_file = os.path.join(chkpt_dir, 'critic_torch_ppo_2')
         self.critic = nn.Sequential(
+            nn.BatchNorm1d(*input_dims),
             nn.Linear(*input_dims, fc1_dims),
             nn.ReLU(),
             nn.Linear(fc1_dims, fc2_dims),
@@ -89,7 +90,7 @@ class ActorNetwork(nn.Module):
                  fc1_dims=512, fc2_dims=256, fc3_dims=256, chkpt_dir='continuous_lunar_lander_weights'):
         super(ActorNetwork, self).__init__()
         self.n_actions = n_actions
-        self.checkpoint_file = os.path.join(chkpt_dir, 'actor_torch_ppo')
+        self.checkpoint_file = os.path.join(chkpt_dir, 'actor_torch_ppo_2')
 
         # self.base = nn.Sequential(
         #     nn.Linear(*input_dims, fc1_dims),
@@ -119,6 +120,7 @@ class ActorNetwork(nn.Module):
         ]
 
         self.actor1 = nn.Sequential(
+            nn.BatchNorm1d(*input_dims),
             nn.Linear(*input_dims, fc1_dims),
             nn.ReLU(),
             nn.Linear(fc1_dims, fc2_dims),
@@ -138,6 +140,7 @@ class ActorNetwork(nn.Module):
         )
 
         self.actor2 = nn.Sequential(
+            nn.BatchNorm1d(*input_dims),
             nn.Linear(*input_dims, fc1_dims),
             nn.ReLU(),
             nn.Linear(fc1_dims, fc2_dims),
@@ -283,7 +286,7 @@ if __name__ == '__main__':
     agent = Agent(n_actions=2, batch_size=batch_size,
                   alpha=alpha, n_epochs=n_epochs,
                   input_dims=env.observation_space.shape)
-    agent.load_models()
+    # agent.load_models()
     n_games = 500
 
     figure_file = 'plots/cartpole.png'

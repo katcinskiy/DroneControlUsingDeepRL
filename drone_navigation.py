@@ -1,22 +1,23 @@
 import time
 import numpy as np
 from gym_pybullet_drones.utils.utils import sync
-from env.LiftoffAviary import LiftoffAviary
 from env.LiftoffAviary import ActionType
-from drone_agent import Agent
 import matplotlib.pyplot as plt
 import os.path
 import csv
 from time import gmtime, strftime
+from drone_navigation_agent import Agent
 
-GUI = False  # Use GUI
+from env.NavigationAviary import NavigationAviary
 
-n_episodes = 10000  # Count of games to play
-n_steps = 1000  # Count of steps in a single game
-N = 1000  # Frequency of policy update and size of memory
-batch_size = 100
+GUI = True             # Use GUI
+
+n_episodes = 100000      # Count of games to play
+n_steps = 1000          # Count of steps in a single game
+N = 2000                # Frequency of policy update and size of memory
+batch_size = 400
 n_epochs = 4
-alpha = 7e-4
+alpha = 2.5e-4
 
 
 def write_stat(episode, step, reward, writer, env):
@@ -28,7 +29,8 @@ def write_stat(episode, step, reward, writer, env):
 
 if __name__ == "__main__":
 
-    env = LiftoffAviary(gui=GUI,
+    goal_position = np.array([1, 1, 1])
+    env = NavigationAviary(goal_position, gui=GUI,
                         record=False,
                         act=ActionType.RPM)
     agent = Agent(n_actions=4, batch_size=batch_size,
@@ -44,7 +46,7 @@ if __name__ == "__main__":
     score_history = []
     avg_score_history = []
 
-    stat_filename = 'stat/stat_' + strftime("%Y-%m-%d_%H:%M:%S", gmtime()) + '.csv'
+    stat_filename = 'stat_navigation/stat_' + strftime("%Y-%m-%d_%H:%M:%S", gmtime()) + '.csv'
     if not os.path.isfile(stat_filename):
         file = open(stat_filename, 'w')
         writer = csv.writer(file)
@@ -56,12 +58,17 @@ if __name__ == "__main__":
     file = open(stat_filename, 'a')
     writer = csv.writer(file)
 
+    length = np.linalg.norm(goal_position - [0, 0, 0])
+
     for episode in range(n_episodes):
         obs = env.reset()
         start = time.time()
         score = 0
         for i in range(n_steps):
-
+            dif = (goal_position - env._getDroneStateVector(0)[:3]) / length
+            obs[0] = dif[0]
+            obs[1] = dif[1]
+            obs[2] = dif[2]
             actions, prob, val = agent.choose_action(obs)
             obs, reward, done, info = env.step(actions)
             current_step += 1
