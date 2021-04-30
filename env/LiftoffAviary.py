@@ -12,6 +12,7 @@ class LiftoffAviary(BaseSingleAgentAviary):
     ################################################################################
 
     def __init__(self,
+                 goal,
                  drone_model: DroneModel = DroneModel.CF2X,
                  initial_xyzs=None,
                  initial_rpys=None,
@@ -62,7 +63,7 @@ class LiftoffAviary(BaseSingleAgentAviary):
                          obs=obs,
                          act=act
                          )
-
+        self.goal = goal
     ################################################################################
 
     def _computeReward(self):
@@ -79,10 +80,7 @@ class LiftoffAviary(BaseSingleAgentAviary):
         #     return -100
         # state = self._getDroneStateVector(0)
         # return -np.linalg.norm(state[:3] - np.array([0, 0, 0.5]))
-        if state[2] < 0.02:
-            return -5
-        else:
-            return -1 / (10 * state[2])
+        return -(state[2] - self.goal) ** 2
 
     ################################################################################
 
@@ -96,7 +94,7 @@ class LiftoffAviary(BaseSingleAgentAviary):
 
         """
         # state = self._getDroneStateVector(0)
-        if self.step_counter > 200:
+        if self.step_counter > 1000:
             return True
         else:
             return False
