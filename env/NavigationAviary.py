@@ -76,13 +76,8 @@ class NavigationAviary(BaseSingleAgentAviary):
             The reward.
 
         """
-        # state = self._getDroneStateVector(0)
-        # # if state[2] < 0.02:
-        # #     return -5
-        # # else:
-        # #     return -1 / (10 * state[2])
-        # return -np.linalg.norm(self.goal - state[:3])
-        return np.linalg.norm(self.rpy)
+        state = self._getDroneStateVector(0)
+        return -1 * np.linalg.norm(np.array([0, 0, 1]) - state[0:3]) ** 2
 
     ################################################################################
 
@@ -96,7 +91,7 @@ class NavigationAviary(BaseSingleAgentAviary):
 
         """
         # state = self._getDroneStateVector(0)
-        if self.step_counter > 200:
+        if self.step_counter / self.SIM_FREQ > self.EPISODE_LEN_SEC:
             return True
         else:
             return False
