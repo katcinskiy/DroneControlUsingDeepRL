@@ -12,7 +12,6 @@ class NavigationAviary(BaseSingleAgentAviary):
     ################################################################################
 
     def __init__(self,
-                 goal,
                  drone_model: DroneModel = DroneModel.CF2X,
                  initial_xyzs=None,
                  initial_rpys=None,
@@ -63,7 +62,6 @@ class NavigationAviary(BaseSingleAgentAviary):
                          obs=obs,
                          act=act
                          )
-        self.goal = goal
 
     ################################################################################
 

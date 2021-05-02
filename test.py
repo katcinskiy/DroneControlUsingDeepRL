@@ -48,6 +48,8 @@ from gym_pybullet_drones.envs.single_agent_rl.FlyThruGateAviary import FlyThruGa
 from gym_pybullet_drones.envs.single_agent_rl.TuneAviary import TuneAviary
 from gym_pybullet_drones.envs.single_agent_rl.BaseSingleAgentAviary import ActionType, ObservationType
 
+from env.LiftoffAviary import LiftoffAviary
+from env.NavigationAviary import NavigationAviary
 
 EPISODE_REWARD_THRESHOLD = -0  # Upperbound: rewards are always negative, but non-zero
 """float: Reward threshold to halt the script."""
@@ -61,8 +63,8 @@ if __name__ == "__main__":
     parser.add_argument('--algo', default='ppo', type=str, choices=['a2c', 'ppo', 'sac', 'td3', 'ddpg'],
                         help='Help (default: ..)', metavar='')
     parser.add_argument('--obs', default='kin', type=ObservationType, help='Help (default: ..)', metavar='')
-    parser.add_argument('--act', default='one_d_rpm', type=ActionType, help='Help (default: ..)', metavar='')
-    parser.add_argument('--cpu', default='1', type=int, help='Help (default: ..)', metavar='')
+    parser.add_argument('--act', default='rpm', type=ActionType, help='Help (default: ..)', metavar='')
+    parser.add_argument('--cpu', default='12', type=int, help='Help (default: ..)', metavar='')
     ARGS = parser.parse_args()
 
     #### Save directory ########################################
@@ -83,13 +85,13 @@ if __name__ == "__main__":
     sa_env_kwargs = dict(aggregate_phy_steps=5, obs=ARGS.obs, act=ARGS.act)
     # train_env = gym.make(env_name, aggregate_phy_steps=shared_constants.AGGR_PHY_STEPS, obs=ARGS.obs, act=ARGS.act) # single environment instead of a vectorized one
     if env_name == "takeoff-aviary-v0":
-        train_env = make_vec_env(TakeoffAviary,
+        train_env = make_vec_env(LiftoffAviary,
                                  env_kwargs=sa_env_kwargs,
                                  n_envs=ARGS.cpu,
                                  seed=0
                                  )
     if env_name == "hover-aviary-v0":
-        train_env = make_vec_env(HoverAviary,
+        train_env = make_vec_env(NavigationAviary,
                                  env_kwargs=sa_env_kwargs,
                                  n_envs=ARGS.cpu,
                                  seed=0
@@ -100,7 +102,7 @@ if __name__ == "__main__":
 
     #### On-policy algorithms ##################################
     onpolicy_kwargs = dict(activation_fn=torch.nn.ReLU,
-                           net_arch=[512, 512, dict(vf=[256, 128], pi=[256, 128])]
+                           net_arch=[256, 512, dict(vf=[256, 128], pi=[256, 128])]
                            )  # or None
 
     if ARGS.algo == 'ppo':
@@ -139,7 +141,8 @@ if __name__ == "__main__":
                                  deterministic=True,
                                  render=False
                                  )
-    model.learn(total_timesteps=30000,  # int(1e12),
+
+    model.learn(total_timesteps=1000000000,  # int(1e12),
                 callback=eval_callback,
                 log_interval=100,
                 )
