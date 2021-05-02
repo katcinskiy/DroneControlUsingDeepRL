@@ -14,10 +14,10 @@ GUI = False  # Use GUI
 
 n_episodes = 10000  # Count of games to play
 n_steps = 1000  # Count of steps in a single game
-N = 1000  # Frequency of policy update and size of memory
-batch_size = 100
+N = 100  # Frequency of policy update and size of memory
+batch_size = 10
 n_epochs = 4
-alpha = 7e-4
+alpha = 3e-4
 
 
 def write_stat(episode, step, reward, writer, env):
@@ -29,14 +29,14 @@ def write_stat(episode, step, reward, writer, env):
 
 if __name__ == "__main__":
 
-    goal = 0.7
+    goal = 0.5
 
     env = LiftoffAviary(goal, gui=GUI,
                         record=False,
                         act=ActionType.ONE_D_RPM)
-    agent = LiftoffSingleAgent(n_actions=4, batch_size=batch_size,
+    agent = LiftoffSingleAgent(n_actions=1, batch_size=batch_size,
                   alpha=alpha, n_epochs=n_epochs,
-                  input_dims=env.observation_space.shape[0])
+                  input_dims=2)
     # agent.load_models()
 
     current_step = 0
@@ -71,11 +71,12 @@ if __name__ == "__main__":
         start = time.time()
         score = 0
         for i in range(n_steps):
-            actions, prob, val = agent.choose_action(obs)
+            clip_obs = np.hstack((obs[2], obs[5]))
+            actions, prob, val = agent.choose_action(clip_obs)
             obs, reward, done, info = env.step(actions)
             current_step += 1
             score += reward
-            agent.remember(obs, actions, prob, val, reward, done)
+            agent.remember(clip_obs, actions, prob, val, reward, done)
             write_stat(episode, current_step, reward, writer, env)
             if i % env.SIM_FREQ == 0 and GUI:
                 env.render()

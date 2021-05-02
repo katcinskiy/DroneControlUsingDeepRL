@@ -80,7 +80,10 @@ class LiftoffAviary(BaseSingleAgentAviary):
         #     return -100
         # state = self._getDroneStateVector(0)
         # return -np.linalg.norm(state[:3] - np.array([0, 0, 0.5]))
-        return -(state[2] - self.goal) ** 2
+        if 0.5 <= state[2] <= 0.99:
+            return 1
+        else:
+            return -1
 
     ################################################################################
 
@@ -94,7 +97,7 @@ class LiftoffAviary(BaseSingleAgentAviary):
 
         """
         # state = self._getDroneStateVector(0)
-        if self.step_counter > 1000:
+        if self.step_counter > 10000:
             return True
         else:
             return False

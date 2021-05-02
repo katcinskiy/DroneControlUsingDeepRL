@@ -16,7 +16,7 @@ n_steps = 1000  # Count of steps in a single game
 N = 1000  # Frequency of policy update and size of memory
 batch_size = 100
 n_epochs = 4
-alpha = 7e-4
+alpha = 5e-4
 
 
 def write_stat(episode, step, reward, writer, env):
@@ -34,7 +34,7 @@ if __name__ == "__main__":
     agent = Agent(n_actions=4, batch_size=batch_size,
                   alpha=alpha, n_epochs=n_epochs,
                   input_dims=env.observation_space.shape[0])
-    agent.load_models()
+    # agent.load_models()
 
     current_step = 0
     learn_iters = 0
