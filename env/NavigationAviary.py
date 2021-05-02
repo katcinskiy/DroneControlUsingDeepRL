@@ -75,7 +75,13 @@ class NavigationAviary(BaseSingleAgentAviary):
 
         """
         state = self._getDroneStateVector(0)
-        return -1 * np.linalg.norm(np.array([0, 0, 1]) - state[0:3]) ** 2
+        ang_v_x = state[13]
+        ang_v_y = state[14]
+        ang_v_z = state[15]
+        ang_x = state[7]
+        ang_y = state[8]
+        ang_z = state[9]
+        return -1 * np.linalg.norm(np.array([0, 0, 1]) ** 2 - state[0:3]) ** 2 - ang_x ** 2 - ang_y ** 2 - ang_z ** 2
 
     ################################################################################
 
