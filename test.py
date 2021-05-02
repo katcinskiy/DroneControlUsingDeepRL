@@ -106,7 +106,6 @@ if __name__ == "__main__":
                            )  # or None
 
     if ARGS.algo == 'ppo':
-        PPO.load('results/save-hover-ppo-kin-rpm-05.02.2021_18.15.59/best_model')
         model = PPO(a2cppoMlpPolicy,
                     train_env,
                     policy_kwargs=onpolicy_kwargs,
