@@ -81,7 +81,9 @@ class NavigationAviary(BaseSingleAgentAviary):
         ang_x = state[7]
         ang_y = state[8]
         ang_z = state[9]
-        return -1 * np.linalg.norm(np.array([0, 0, 1]) ** 2 - state[0:3]) ** 2 - ang_x ** 2 - ang_y ** 2 - ang_z ** 2
+        return 0
+        # return 0.000000001 * (max(0, 1 - np.linalg.norm(np.array([0, 0, 0.15]) - state[:3])) - 0.001 * np.linalg.norm(np.array([ang_v_x, ang_v_y, ang_v_z])) \
+        #        - 0.001 * np.linalg.norm(np.array([ang_x, ang_y, ang_z])))
 
     ################################################################################
 

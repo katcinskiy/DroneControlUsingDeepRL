@@ -40,7 +40,8 @@ from stable_baselines3.sac.policies import SACPolicy as sacMlpPolicy
 from stable_baselines3.sac import CnnPolicy as sacCnnPolicy
 from stable_baselines3.td3 import MlpPolicy as td3ddpgMlpPolicy
 from stable_baselines3.td3 import CnnPolicy as td3ddpgCnnPolicy
-from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback, StopTrainingOnRewardThreshold
+from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback, StopTrainingOnRewardThreshold, \
+    CallbackList
 
 from gym_pybullet_drones.envs.single_agent_rl.TakeoffAviary import TakeoffAviary
 from gym_pybullet_drones.envs.single_agent_rl.HoverAviary import HoverAviary
@@ -51,7 +52,7 @@ from gym_pybullet_drones.envs.single_agent_rl.BaseSingleAgentAviary import Actio
 from env.LiftoffAviary import LiftoffAviary
 from env.NavigationAviary import NavigationAviary
 
-EPISODE_REWARD_THRESHOLD = -0  # Upperbound: rewards are always negative, but non-zero
+EPISODE_REWARD_THRESHOLD = 1000  # Upperbound: rewards are always negative, but non-zero
 """float: Reward threshold to halt the script."""
 
 if __name__ == "__main__":
@@ -84,14 +85,14 @@ if __name__ == "__main__":
     env_name = ARGS.env + "-aviary-v0"
     sa_env_kwargs = dict(aggregate_phy_steps=5, obs=ARGS.obs, act=ARGS.act)
     # train_env = gym.make(env_name, aggregate_phy_steps=shared_constants.AGGR_PHY_STEPS, obs=ARGS.obs, act=ARGS.act) # single environment instead of a vectorized one
-    if env_name == "takeoff-aviary-v0":
-        train_env = make_vec_env(LiftoffAviary,
-                                 env_kwargs=sa_env_kwargs,
-                                 n_envs=ARGS.cpu,
-                                 seed=0
-                                 )
+    # if env_name == "takeoff-aviary-v0":
+    #     train_env = make_vec_env(LiftoffAviary,
+    #                              env_kwargs=sa_env_kwargs,
+    #                              n_envs=ARGS.cpu,
+    #                              seed=0
+    #                              )
     if env_name == "hover-aviary-v0":
-        train_env = make_vec_env(NavigationAviary,
+        train_env = make_vec_env(HoverAviary,
                                  env_kwargs=sa_env_kwargs,
                                  n_envs=ARGS.cpu,
                                  seed=0
@@ -110,7 +111,7 @@ if __name__ == "__main__":
                     train_env,
                     policy_kwargs=onpolicy_kwargs,
                     tensorboard_log=filename + '/tb/',
-                    verbose=1
+                    verbose=1,
                     ) if ARGS.obs == ObservationType.KIN else PPO(a2cppoCnnPolicy,
                                                                   train_env,
                                                                   policy_kwargs=onpolicy_kwargs,
@@ -127,7 +128,7 @@ if __name__ == "__main__":
                             )
 
     #### Train the model #######################################
-    # checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=filename+'-logs/', name_prefix='rl_model')
+    checkpoint_callback = CheckpointCallback(save_freq=5000, save_path=filename+'-logs/', name_prefix='rl_model')
 
     callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=EPISODE_REWARD_THRESHOLD,
                                                      verbose=1
@@ -138,11 +139,13 @@ if __name__ == "__main__":
                                  best_model_save_path=filename + '/',
                                  log_path=filename + '/',
                                  eval_freq=int(2000 / ARGS.cpu),
-                                 deterministic=True,
+                                 deterministic=False,
                                  render=False
                                  )
 
-    model.learn(total_timesteps=1000000000,  # int(1e12),
+    callback = CallbackList([checkpoint_callback, eval_callback])
+
+    model.learn(total_timesteps=10000000,  # int(1e12),
                 callback=eval_callback,
                 log_interval=100,
                 )
